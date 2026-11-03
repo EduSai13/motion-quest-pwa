@@ -6,18 +6,19 @@
 <link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Lilita+One&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css"></head>
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="space.css"></head>
 <body>
 <header><h1><span class="spk">✦</span> Motion Quest</h1>
-<nav><button class="tab on" data-t="play">▶ Games</button><button class="tab" data-t="edit">✎ Editor</button><button class="tab" data-t="trophy">🏆 Trophies</button><button class="tab" data-t="ppst">✦ PPST</button></nav></header>
+<nav><button class="tab on" data-t="home">🏠 Home</button><button class="tab" data-t="play">🎮 Games</button><button class="tab" data-t="edit">✎ Create</button><button class="tab" data-t="trophy">🏆 Records</button><button class="tab" data-t="ppst">✦ ICT</button></nav></header>
 <main>
-<section id="play">
+<section id="home"></section>
+<section id="play" class="hide">
  <div id="menu" class="card"><div class="big" id="mt"></div><p class="mut" id="ms"></p>
   <p>Wave a hand (or move) inside an answer zone and hold it there to lock in your answer. Your camera stays on this device; nothing is uploaded.</p>
   <button class="btn pri" id="go">Start with camera</button> <button class="btn" id="gom">Start without camera (mouse/touch)</button></div>
  <div id="game" class="hide">
   <div class="hud"><span id="hr"></span><span id="hp"></span><span id="ht"></span><span id="hs"></span></div>
-  <div id="stage"><video id="vid" muted playsinline></video><canvas id="dbg"></canvas><div id="q"></div><div id="ov" class="ov hide"></div></div>
+  <div id="board" class="hide"></div><div id="stage"><video id="vid" muted playsinline></video><canvas id="dbg"></canvas><div id="q"></div><div id="ov" class="ov hide"></div></div>
   <p class="mut" id="gn"></p><div id="setup" class="card hide"></div><button class="btn danger" id="quit">Quit</button>
  </div>
  <div id="end" class="card hide"></div>
@@ -26,5 +27,5 @@
 <section id="trophy" class="hide"></section>
 <section id="ppst" class="hide"></section>
 </main>
-<script src="app.js"></script>
+<script src="app.js"></script><script src="games.js"></script>
 </body></html>

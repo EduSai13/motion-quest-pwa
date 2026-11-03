@@ -1,29 +1,31 @@
 const $=s=>document.querySelector(s),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mc=(q,o,k)=>({type:'mc',q,opts:o,key:k}),tf=(q,k)=>({type:'tf',q,opts:['True','False'],key:k}),so=(p,c,r)=>({type:'sort',q:p,cats:c,rows:r.map(x=>({w:x[0],c:x[1]})),shuffle:true});
-const sample=()=>({title:'Science Motion Quest',theme:'sunburst',time:15,hold:1.2,sens:4,read:4,rounds:[
+const sample=()=>({title:'Science Motion Quest',theme:'sunburst',mode:'quiz',time:15,hold:1.2,sens:4,read:4,rounds:[
  {name:'Round 1: Matter',items:[mc('Which state of matter has a definite volume but no definite shape?',['Solid','Liquid','Gas','Plasma'],1),tf('Water boils at 100 °C at sea level.',0)]},
  {name:'Round 2: Sort the rocks',items:[so('Rock type',['Igneous','Sedimentary','Metamorphic'],[['Granite',0],['Marble',2],['Basalt',0],['Limestone',1],['Slate',2],['Sandstone',1]])]}]});
 const uid=()=>Math.random().toString(36).slice(2,9);
 let DB={games:[],i:0};
 try{const s=JSON.parse(localStorage.getItem('mq_db')||'null');if(s&&s.games&&s.games.length)DB=s;else{const o=JSON.parse(localStorage.getItem('mq_act')||'null');if(o&&o.rounds){o.id=uid();o.plays=[];DB.games.push(o)}}}catch(e){}
-if(!DB.games.length){const g=sample();g.id=uid();g.plays=[];DB.games.push(g)}
+if(!DB.games.length){const g=sample();g.id=uid();g.plays=[];g.mode='quiz';DB.games.push(g);
+ const s=sample();s.id=uid();s.plays=[];s.mode='snakes';s.title='Space Race (sample)';DB.games.push(s);
+ const m=sample();m.id=uid();m.plays=[];m.mode='memory';m.title='Atoms Memory (sample)';m.pairs='Proton = Positive charge\nElectron = Negative charge\nNeutron = No charge\nNucleus = Center of an atom\nIsotope = Same protons, different neutrons';DB.games.push(m)}
 let A=DB.games[Math.min(DB.i||0,DB.games.length-1)];
 const save=()=>{try{localStorage.setItem('mq_db',JSON.stringify(DB))}catch(e){}};
 function setA(o){o.id=A.id;o.plays=A.plays||[];DB.games[DB.games.indexOf(A)]=A=o;save()}
-function theme(){const r=document.documentElement;A.theme&&A.theme!=='sunburst'?r.setAttribute('data-theme',A.theme):r.removeAttribute('data-theme')}
-function tab(t){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['play','edit','trophy','ppst'].forEach(x=>$('#'+x).classList.toggle('hide',x!==t));if(t==='edit')ed();if(t==='ppst')pp();if(t==='trophy')tr();if(t==='play')menu()}
+function theme(){const r=document.documentElement,t=DB.theme||'cosmos';t==='cosmos'?r.removeAttribute('data-theme'):r.setAttribute('data-theme',t)}
+function tab(t){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['home','play','edit','trophy','ppst'].forEach(x=>$('#'+x).classList.toggle('hide',x!==t));if(t==='edit')ed();if(t==='ppst')pp();if(t==='trophy')tr();if(t==='play')menu();if(t==='home')homeR()}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{stop();tab(b.dataset.t)});
 const cnt=g=>g.rounds.reduce((n,r)=>n+r.items.reduce((m,i)=>m+(i.type==='sort'?i.rows.length:1),0),0),count=()=>cnt(A);
 /* ---------- EDITOR ---------- */
 const sel=(v,list)=>list.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('');
 function ed(){
- let h=`<div class="card"><div class="row"><label class="f" style="flex:2;min-width:180px">Activity title<input type="text" value="${esc(A.title)}" oninput="A.title=this.value;save()"></label>
- <label class="f">Theme<select onchange="A.theme=this.value;theme();save()">${sel(A.theme,['sunburst','desert','dusk','chiffon','matcha','dark'])}</select></label>
+ let h=`<div class="card"><b>Make a new game</b><div class="row" style="margin-top:8px">${Object.entries(MODES).map(([k,v])=>`<button class="btn" onclick="newGame('${k}')">${v[0]} ${v[1]}</button>`).join('')}</div></div><div class="card"><div class="row"><label class="f" style="flex:2;min-width:180px">Activity title<input type="text" value="${esc(A.title)}" oninput="A.title=this.value;save()"></label>
+ <label class="f">Game type<select onchange="A.mode=this.value;save();ed()">${Object.entries(MODES).map(([k,v])=>`<option value="${k}" ${(A.mode||'quiz')===k?'selected':''}>${v[0]} ${v[1]}</option>`).join('')}</select></label>${A.mode==='tug'?`<label class="f">Pulls to win<input type="number" min="2" max="10" value="${A.tugN||5}" onchange="A.tugN=+this.value||5;save()"></label>`:''}
  <label class="f">Seconds per item<input type="number" min="5" max="120" value="${A.time}" onchange="A.time=+this.value||15;save()"></label>
  <label class="f">Hold to answer (s)<input type="number" min="0.5" max="5" step="0.1" value="${A.hold}" onchange="A.hold=+this.value||1.2;save()"></label>
  <label class="f">Read time (s)<input type="number" min="0" max="30" value="${A.read??4}" onchange="A.read=Math.max(0,+this.value||0);save()"></label>
  <label class="f">Motion needed (% of zone)<input type="number" min="1" max="40" value="${A.sens}" onchange="A.sens=+this.value||6;save()"></label></div></div>`;
- A.rounds.forEach((r,ri)=>{
+ if(A.mode==='memory')h+=pairsEd();else A.rounds.forEach((r,ri)=>{
   h+=`<div class="card"><div class="row"><label class="f" style="flex:1"><span>Round / section ${ri+1}</span><input type="text" value="${esc(r.name)}" oninput="A.rounds[${ri}].name=this.value;save()"></label>
   <button class="btn danger" onclick="delR(${ri})">Delete round</button></div>`;
   r.items.forEach((it,ii)=>{
@@ -52,16 +54,32 @@ const W=160,H=120,cv=document.createElement('canvas');cv.width=W;cv.height=H;con
 const LAY={2:[[0,0,.5,1],[.5,0,.5,1]],3:[[0,0,1/3,1],[1/3,0,1/3,1],[2/3,0,1/3,1]],4:[[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]]};
 let S=null,stream=null,cam=false,prev=null,raf=0,flat=[],Z=[],hov={},last=0,acc=0,sm=[],useCam=true;
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),trophy=p=>p==null?'':p>=90?'🏆':p>=75?'🥈':p>=50?'🥉':'⭐';
-function stop(){cancelAnimationFrame(raf);S=null;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#vid').srcObject=null;ov('');$('#setup').classList.add('hide');dctx.clearRect(0,0,W,H)}
+let GID=0;
+function stop(){cancelAnimationFrame(raf);S=null;GID++;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('#vid').srcObject=null;ov('');$('#setup').classList.add('hide');dctx.clearRect(0,0,W,H);$('#board').classList.add('hide');$('#game').classList.remove('bm')}
 function ov(h){const o=$('#ov');o.innerHTML=h||'';o.classList.toggle('hide',!h)}
 /* ---------- GAME LIBRARY ---------- */
 function pick(i){DB.i=i;A=DB.games[i];theme();save()}
 function menu(){stop();const m=$('#menu');m.className='';
- m.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:10px"><b style="font-size:1.2rem">My games <span class="mut" style="font-size:.7rem">build 4</span></b><button class="btn pri" onclick="newGame()">+ New game</button></div>`+DB.games.map((g,i)=>{const p=g.plays||[],b=p.length?Math.max(...p.map(x=>x.pct)):null;
- return `<div class="card"><div class="row"><div style="flex:1;min-width:160px"><b>${esc(g.title)}</b><div class="mut">${g.rounds.length} round(s) · ${cnt(g)} items · ${p.length?'played '+p.length+'× · best '+b+'%':'not played yet'}</div></div><span style="font-size:1.8rem">${trophy(b)}</span></div>
+ m.innerHTML=`<div class="row" style="justify-content:space-between;margin-bottom:10px"><b style="font-size:1.2rem">My games <span class="mut" style="font-size:.7rem">build 4</span></b><button class="btn pri" onclick="tab('edit')">+ New game</button></div>`+DB.games.map((g,i)=>{const p=g.plays||[],b=p.length?Math.max(...p.map(x=>x.pct)):null;
+ return `<div class="card"><div class="row"><div style="flex:1;min-width:160px"><b>${esc(g.title)}</b><div><span class="tag">${MODES[g.mode||'quiz'][0]} ${MODES[g.mode||'quiz'][1]}</span></div><div class="mut">${g.mode==='memory'?(g.pairs||'').split('\n').filter(x=>x.includes('=')).length+' pairs':g.rounds.length+' round(s) · '+cnt(g)+' items'} · ${p.length?'played '+p.length+'× · best '+b+'%':'not played yet'}</div></div><span style="font-size:1.8rem">${trophy(b)}</span></div>
  <div class="row" style="margin-top:8px"><button class="btn pri" onclick="pick(${i});lobby(true)">Play</button><button class="btn" onclick="pick(${i});lobby(false)">Mouse/touch</button><button class="btn" onclick="pick(${i});tab('edit')">Edit</button><button class="btn" onclick="dup(${i})">Copy</button><button class="btn danger" onclick="delG(${i})">Delete</button></div></div>`}).join('');
  m.classList.remove('hide');$('#game').classList.add('hide');$('#end').classList.add('hide')}
-function newGame(){const g=sample();g.title='New game';g.id=uid();g.plays=[];g.rounds=[{name:'Round 1',items:[mc('New question',['A','B','C','D'],0)]}];DB.games.push(g);pick(DB.games.length-1);tab('edit')}
+const MODES={quiz:['🧠','Classic Quiz'],snakes:['🚀','Space Snakes & Ladders'],tug:['🛸','Space Tug-of-War'],memory:['🃏','Memory Match']};
+function newGame(m){m=m||'quiz';const g=sample();g.mode=m;g.title={quiz:'New quiz',snakes:'New space race',tug:'New tug-of-war',memory:'New memory match'}[m];g.id=uid();g.plays=[];g.rounds=[{name:'Round 1',items:[mc('New question',['A','B','C','D'],0)]}];if(m==='memory')g.pairs='Atom = Smallest unit of matter\nCell = Basic unit of life\nProton = Positive particle\nElectron = Negative particle';DB.games.push(g);pick(DB.games.length-1);tab('edit')}
+const pairsEd=()=>`<div class="card"><b>Card pairs</b><p class="mut">One pair per line: term = match. Up to 6 pairs (12 cards).</p><textarea rows="8" oninput="A.pairs=this.value;save()">${esc(A.pairs||'')}</textarea></div>`;
+const planet=(a,b)=>`<svg viewBox="0 0 100 100"><ellipse cx="50" cy="52" rx="48" ry="12" fill="none" stroke="${b}" stroke-width="5" transform="rotate(-18 50 50)"/><circle cx="50" cy="50" r="30" fill="${a}"/><circle cx="40" cy="42" r="6" fill="${b}" opacity=".5"/><circle cx="60" cy="60" r="8" fill="${b}" opacity=".4"/></svg>`;
+function homeR(){const g=DB.games[DB.i]||DB.games[0],pl=(g.plays||[]).length;
+ $('#home').innerHTML=`<div class="hero"><div class="pl p1">${planet('#ff8a4c','#ffd166')}</div><div class="pl p2">${planet('#46e0ff','#8b7bff')}</div><div class="pl p3">${planet('#ff6fb5','#ffd1ec')}</div><div class="rk">🚀</div>
+ <h2 class="logo">Motion<br>Quest</h2><p class="mut" style="position:relative;z-index:1">Wave to play. Space games for the classroom.</p>
+ <div class="menu"><button class="btn pri big" onclick="tab('play')">▶ Play</button><button class="btn big" onclick="tab('edit')">✎ Create</button><button class="btn big" onclick="tab('trophy')">🏆 Records</button></div></div>
+ <div class="card"><b>Jump back in</b><div class="row" style="margin-top:8px"><div style="flex:1;min-width:160px"><b>${esc(g.title)}</b><div class="mut">${MODES[g.mode||'quiz'][0]} ${MODES[g.mode||'quiz'][1]} · played ${pl}×</div></div><button class="btn pri" onclick="tab('play');pick(${DB.games.indexOf(g)});lobby(true)">Play</button></div></div>
+ <div class="card"><b>Settings</b><div class="row" style="margin-top:8px"><label class="f">Theme<select onchange="DB.theme=this.value;theme();save()">${sel(DB.theme||'cosmos',['cosmos','nebula','sunburst','desert','dusk','chiffon','matcha','dark'])}</select></label><label class="mut"><input type="checkbox" ${DB.mute?'':'checked'} onchange="DB.mute=!this.checked;save()"> Sound effects</label></div></div>`}
+function mkZ(labels,R,cls){document.querySelectorAll('.zone').forEach(z=>z.remove());hov={};
+ Z=labels.map((o,k)=>{const d=document.createElement('div');d.className='zone '+(cls||'');const[x,y,w,h]=R[k];
+  d.style.cssText=`left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%`;
+  d.innerHTML=`<span>${esc(o)}</span><div class="bar"></div>`;
+  d.onpointerenter=d.onpointerdown=()=>hov[k]=1;d.onpointerleave=d.onpointerup=d.onpointercancel=()=>hov[k]=0;
+  $('#stage').appendChild(d);return{el:d,r:R[k],p:0,k,on:false}});sm=[];prev=null}
 function dup(i){const g=JSON.parse(JSON.stringify(DB.games[i]));g.id=uid();g.title+=' (copy)';g.plays=[];DB.games.splice(i+1,0,g);save();menu()}
 function delG(i){if(!confirm('Delete this game and its history?'))return;DB.games.splice(i,1);if(!DB.games.length){const g=sample();g.id=uid();g.plays=[];DB.games.push(g)}pick(0);menu()}
 function tr(){const all=DB.games.flatMap(g=>(g.plays||[]).map(p=>({...p,g:g.title}))).sort((a,b)=>b.d-a.d),c=t=>all.filter(p=>trophy(p.pct)===t).length;
@@ -70,7 +88,7 @@ function tr(){const all=DB.games.flatMap(g=>(g.plays||[]).map(p=>({...p,g:g.titl
 /* ---------- PLAY / MOTION ---------- */
 function build(){flat=[];A.rounds.forEach((r,ri)=>r.items.forEach(it=>{if(it.type==='sort'){const rows=it.rows.slice();if(it.shuffle)rows.sort(()=>Math.random()-.5);rows.forEach(w=>flat.push({type:'sort',p:it.q,q:w.w||'(blank)',opts:it.cats,key:w.c,round:r.name,rid:ri}))}else flat.push({...it,round:r.name,rid:ri})}));flat.forEach((x,i)=>x.first=!i||flat[i-1].rid!==x.rid)}
 async function lobby(c){
- useCam=c;build();if(!flat.length){alert('Add at least one item in the Editor.');return}
+ useCam=c;build();if(A.mode==='memory'?!pairs().length:!flat.length){alert('Add at least one '+(A.mode==='memory'?'pair':'item')+' in the Editor.');return}
  stop();cam=false;cerr='';dbgOn=true;
  if(c){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:480},audio:false});const v=$('#vid');v.srcObject=stream;await v.play();cam=true}catch(e){cerr=e.name+(e.message?': '+e.message:'')}}
  $('#menu').classList.add('hide');$('#end').classList.add('hide');$('#game').classList.remove('hide');
@@ -89,8 +107,8 @@ async function begin(){
  $('#setup').classList.add('hide');dbgOn=!!($('#dbgc')&&$('#dbgc').checked);if(!dbgOn)dctx.clearRect(0,0,W,H);
  const T=($('#tm').value||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,6);A.teams=T.join(', ');save();
  S={i:0,state:'count',T,sc:Object.fromEntries((T.length?T:['Class']).map(t=>[t,0])),turn:0,correct:0,streak:0,best:0,log:[]};
- for(const n of [3,2,1]){if(!S)return;ov(`<div class="big" style="font-size:5rem">${n}</div><div>Get ready</div>`);await wait(800)}
- if(S)next()}
+ const g0=GID;for(const n of [3,2,1]){if(!S||g0!==GID)return;ov(`<div class="big" style="font-size:5rem">${n}</div><div>Get ready</div>`);await wait(800)}
+ if(S&&g0===GID){const m=A.mode||'quiz';m==='quiz'?next():startBoard(m)}}
 function hs(){$('#hs').textContent=Object.entries(S.sc).map(([k,v])=>k+': '+v).join(' · ')}
 function next(){
  if(!S)return;if(S.i>=flat.length)return finish();
@@ -102,12 +120,7 @@ function item(){
  S.cur=S.T.length?S.T[S.turn++%S.T.length]:null;
  document.querySelectorAll('.zone').forEach(z=>z.remove());
  $('#q').innerHTML=(it.p?'<div class="sub">'+esc(it.p)+'</div>':'')+esc(it.q);
- const L=LAY[it.opts.length]||LAY[2];Z=it.opts.map((o,k)=>{
-  const d=document.createElement('div');d.className='zone lock';const [x,y,w,h]=L[k];
-  d.style.cssText=`left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%`;
-  d.innerHTML=`<span>${esc(o)}</span><div class="bar"></div>`;
-  d.onpointerenter=d.onpointerdown=()=>hov[k]=1;d.onpointerleave=d.onpointerup=d.onpointercancel=()=>hov[k]=0;
-  $('#stage').appendChild(d);return{el:d,r:L[k],p:0,k,on:false}});
+ mkZ(it.opts,LAY[it.opts.length]||LAY[2],'lock');S.cb=answer;
  $('#hr').textContent=it.round+(S.cur?' · '+S.cur+'’s turn':'');$('#hp').textContent='Item '+(S.i+1)+'/'+flat.length;hs()}
 let cerr='',dbgOn=false,mask=null;
 const dbg=$('#dbg'),dctx=dbg.getContext('2d');dbg.width=W;dbg.height=H;
@@ -124,21 +137,22 @@ function ratios(){
  const g=gray(cx.getImageData(0,0,W,H).data);let out=Z.map(()=>0);
  if(prev){mask=detect(g,prev);out=zoneR(mask,Z);drawMask(mask)}
  prev=g;return out}
+const H0=()=>A.hold*(A.mode==='memory'?.7:1);
+function prog(dt){let pick=-1,best=-1;const h=H0();Z.forEach((z,i)=>{const v=sm[i]||0;if(z.dead||z.rev){z.p=0;z.on=false;return}
+ z.on=v>=A.sens*(z.on?.5:1);z.p=z.on?Math.min(h,z.p+dt):Math.max(0,z.p-dt*.5);z.el.classList.toggle('act',z.on);z.el.lastChild.style.height=(z.p/h*100)+'%';if(z.p>=h&&v>best){best=v;pick=i}});return pick}
 function loop(t){
  if(!S)return;const dt=Math.min(.1,(t-last)/1000);last=t;const st=S.state;
- if(st==='lobby'||st==='read'||st==='ask'){
+ if(st==='lobby'||st==='read'||st==='ask'||st==='hold'){
   acc+=dt;if(acc>=.04){acc=0;const r=ratios();sm=Z.map((z,i)=>Math.max(r[i],(sm[i]||0)*.75))}
   if(st==='lobby'){const m=$('#mtr'),mr=$('#mread');if(m)m.style.width=Math.min(100,(sm[0]||0)/A.sens*50)+'%';if(mr)mr.textContent=(sm[0]||0).toFixed(1)}
   else if(st==='read'){S.left-=dt;$('#ht').textContent='👀 '+Math.max(0,Math.ceil(S.left))+'s';
    if(S.left<=0){S.state='ask';S.left=A.time;sm=[];prev=null;Z.forEach(z=>z.el.classList.remove('lock'))}}
-  else{let pick=-1,best=-1;
-   Z.forEach((z,i)=>{const v=sm[i]||0;z.on=v>=A.sens*(z.on?.5:1);z.p=z.on?Math.min(A.hold,z.p+dt):Math.max(0,z.p-dt*.5);
-    z.el.classList.toggle('act',z.on);z.el.lastChild.style.height=(z.p/A.hold*100)+'%';if(z.p>=A.hold&&v>best){best=v;pick=i}});
-   S.left-=dt;$('#ht').textContent='⏱ '+Math.max(0,Math.ceil(S.left))+'s';
-   if(pick>=0)answer(pick);else if(S.left<=0)answer(-1)}}
+  else{const pick=prog(dt);
+   if(st==='ask'){S.left-=dt;$('#ht').textContent='⏱ '+Math.max(0,Math.ceil(S.left))+'s';if(pick>=0)S.cb(pick);else if(S.left<=0)S.cb(-1)}
+   else if(pick>=0)S.cb(pick)}}
  raf=requestAnimationFrame(loop)}
 function answer(k){
- const it=flat[S.i],ok=k===it.key,key=S.cur||'Class';S.state='fb';let pts=0;
+ const it=flat[S.i],ok=k===it.key,key=S.cur||'Class';S.state='fb';let pts=0;setTimeout(()=>ok?sfx.ok():sfx.no(),0);
  if(ok){pts=100+Math.round(50*Math.max(0,S.left)/A.time)+Math.min(50,S.streak*10);S.streak++;S.best=Math.max(S.best,S.streak);S.correct++}else S.streak=0;
  S.sc[key]+=pts;S.log.push({rid:it.rid,round:it.round,ok});
  Z.forEach((z,i)=>{z.el.classList.remove('act');if(i===it.key)z.el.classList.add('ok');else if(i===k)z.el.classList.add('bad')});
@@ -148,7 +162,7 @@ function finish(){
  const s=S;stop();$('#game').classList.add('hide');const by={};
  s.log.forEach(l=>{const b=by[l.rid]=by[l.rid]||{n:l.round,c:0,t:0};b.t++;if(l.ok)b.c++});
  const pct=Math.round(s.correct/flat.length*100),rk=Object.entries(s.sc).sort((a,b)=>b[1]-a[1]),perfect=Object.values(by).filter(b=>b.c===b.t).map(b=>b.n),med=['🥇','🥈','🥉'];
- (A.plays=A.plays||[]).unshift({d:Date.now(),pct,score:s.correct,total:flat.length,top:rk[0][0],pts:rk[0][1],streak:s.best});A.plays.length=Math.min(A.plays.length,30);save();
+ if(pct>=75)confetti();(A.plays=A.plays||[]).unshift({d:Date.now(),pct,score:s.correct,total:flat.length,top:rk[0][0],pts:rk[0][1],streak:s.best});A.plays.length=Math.min(A.plays.length,30);save();
  $('#end').innerHTML=`<div class="big">${trophy(pct)} ${s.correct} / ${flat.length}</div><p class="mut">${pct}% correct · best streak ${s.best}</p>`+
  (s.T.length?`<div class="card" style="background:var(--bg)"><b>Leaderboard</b>${rk.map((r,i)=>`<div class="opt"><span>${med[i]||(i+1)+'.'}</span><b style="flex:1">${esc(r[0])}</b>${r[1]} pts</div>`).join('')}</div>`:`<p><b>${rk[0][1]} points</b></p>`)+
  (perfect.length?`<p>⭐ Perfect round: ${perfect.map(esc).join(', ')}</p>`:'')+(s.best>=5?`<p>🔥 ${s.best} in a row</p>`:'')+(pct===100?'<p>🏅 Perfect game</p>':'')+
@@ -168,7 +182,7 @@ function pp(){
  <table>${PPST.map(p=>`<tr><td><b>${p[0]}</b></td><td>${p[1]}<div class="mut">${p[2]}</div></td></tr>`).join('')}</table></div>
  <div class="card"><b>Lesson-plan snippet</b><textarea rows="6" onclick="this.select()">${esc(note)}</textarea></div>
  <div class="card"><b>Classroom setup tips</b><p class="mut">Face the camera toward learners with steady lighting. Keep the background still (a moving curtain counts as motion). Raise “Motion needed” if zones trigger by themselves, lower it if they do not respond. For offline use, open the app once with internet, then add it to the home screen; after that it works without a connection.</p></div>`}
-theme();menu();
+theme();tab('home');
 if('serviceWorker' in navigator){const had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!window.__r){window.__r=1;location.reload()}});addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 
 /* ---------- SORTING TABLE EDITOR ---------- */
